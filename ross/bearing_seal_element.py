@@ -1882,9 +1882,6 @@ class BearingElement6DoF(BearingElement):
                         " must have the same dimension"
                     )
 
-    def __hash__(self):
-        return hash(self.tag)
-
     def __repr__(self):
         """Return a string representation of a bearing element.
 
@@ -1980,99 +1977,8 @@ class BearingElement6DoF(BearingElement):
             return init_args_comparison and attributes_comparison
         return False
 
-    def save(self, file):
-        try:
-            data = toml.load(file)
-        except FileNotFoundError:
-            data = {}
-
-        # remove some info before saving
-        brg_data = self.__dict__.copy()
-        params_to_remove = [
-            "kxx_interpolated",
-            "kyy_interpolated",
-            "kxy_interpolated",
-            "kyx_interpolated",
-            "kzz_interpolated",
-            "cxx_interpolated",
-            "cyy_interpolated",
-            "cxy_interpolated",
-            "cyx_interpolated",
-            "czz_interpolated",
-            "dof_global_index",
-        ]
-        for p in params_to_remove:
-            brg_data.pop(p)
-
-        # change np.array to lists so that we can save in .toml as list(floats)
-        params = [
-            "kxx",
-            "kyy",
-            "kxy",
-            "kyx",
-            "kzz",
-            "cxx",
-            "cyy",
-            "cxy",
-            "cyx",
-            "czz",
-            "mxx",
-            "myy",
-            "mxy",
-            "myx",
-            "mzz",
-            "frequency",
-        ]
-        for p in params:
-            try:
-                brg_data[p] = [float(i) for i in brg_data[p]]
-            except TypeError:
-                pass
-
-        data[f"{self.__class__.__name__}_{self.tag}"] = brg_data
-
-        with open(file, "w") as f:
-            toml.dump(data, f)
-
-    @classmethod
-    def load(cls, file):
-        data = toml.load(file)
-        # extract single dictionary in the data
-        data = list(data.values())[0]
-        params = [
-            "kxx",
-            "kyy",
-            "kxy",
-            "kyx",
-            "kzz",
-            "cxx",
-            "cyy",
-            "cxy",
-            "cyx",
-            "czz",
-            "mxx",
-            "myy",
-            "mxy",
-            "myx",
-            "mzz",
-            "frequency",
-            "n",
-            "tag",
-            "n_link",
-            "scale_factor",
-        ]
-        kwargs = {}
-        for p in params:
-            try:
-                kwargs[p] = data.pop(p)
-            except KeyError:
-                pass
-
-        bearing = cls(**kwargs)
-        for k, v in data.items():
-            setattr(bearing, k, v)
-
-        return bearing
+    def __hash__(self):
+        return hash(self.tag)
 
     def dof_mapping(self):
         """Degrees of freedom mapping.
@@ -2128,6 +2034,12 @@ class BearingElement6DoF(BearingElement):
 
         M = np.array([[mxx, mxy, 0], [myx, myy, 0], [0, 0, mzz]])
 
+        if self.n_link is not None:
+            # fmt: off
+            M = np.vstack((np.hstack([M, -M]),
+                           np.hstack([-M, M])))
+            # fmt: on
+
         return M
 
     def K(self, frequency):
@@ -2161,6 +2073,12 @@ class BearingElement6DoF(BearingElement):
 
         K = np.array([[kxx, kxy, 0], [kyx, kyy, 0], [0, 0, kzz]])
 
+        if self.n_link is not None:
+            # fmt: off
+            K = np.vstack((np.hstack([K, -K]),
+                           np.hstack([-K, K])))
+            # fmt: on
+
         return K
 
     def C(self, frequency):
@@ -2193,6 +2111,12 @@ class BearingElement6DoF(BearingElement):
         czz = self.czz_interpolated(frequency)
 
         C = np.array([[cxx, cxy, 0], [cyx, cyy, 0], [0, 0, czz]])
+
+        if self.n_link is not None:
+            # fmt: off
+            C = np.vstack((np.hstack([C, -C]),
+                           np.hstack([-C, C])))
+            # fmt: on
 
         return C
 

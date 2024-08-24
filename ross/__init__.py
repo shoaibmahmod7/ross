@@ -1,10 +1,10 @@
-__version__ = "1.4.3"
+__version__ = "1.5.0"
 from plotly import io as _pio
 
 import ross.plotly_theme
 
 from .bearing_seal_element import *
-from .defects import *
+from .faults import *
 from .disk_element import *
 from .materials import *
 from .point_mass import *

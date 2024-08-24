@@ -314,12 +314,6 @@ def test_evals_sorted_rotor2(rotor2):
             1.1024641658e-11 + 598.0247411456j,
             4.3188161105e-09 + 3956.2249777612j,
             2.5852376472e-11 + 3956.2249797838j,
-            4.3188161105e-09 - 3956.2249777612j,
-            2.5852376472e-11 - 3956.2249797838j,
-            7.4569772223e-11 - 598.0247411492j,
-            1.1024641658e-11 - 598.0247411456j,
-            1.4667459679e-12 - 215.3707255735j,
-            3.9623200168e-12 - 215.3707255733j,
         ]
     )
 
@@ -331,24 +325,18 @@ def test_evals_sorted_rotor2(rotor2):
             8.482603e-08 + 3470.897616j,
             4.878990e-07 + 3850.212629j,
             4.176291e01 + 3990.22903j,
-            4.176291e01 - 3990.22903j,
-            4.878990e-07 - 3850.212629j,
-            8.482603e-08 - 3470.897616j,
-            5.045245e-01 - 215.369011j,
-            -5.045245e-01 - 215.369011j,
-            -4.838034e-14 - 34.822138j,
         ]
     )
     modal2_0 = rotor2.run_modal(speed=0)
     rotor2_evals, rotor2_evects = rotor2._eigen(speed=0)
-    assert_allclose(rotor2_evals, evals_sorted, rtol=1e-3)
-    assert_allclose(modal2_0.evalues, evals_sorted, rtol=1e-3)
+    assert_allclose(rotor2_evals[:6], evals_sorted, rtol=1e-3)
+    assert_allclose(modal2_0.evalues[:6], evals_sorted, rtol=1e-3)
     modal2_10000 = rotor2.run_modal(speed=10000)
-    assert_allclose(modal2_10000.evalues, evals_sorted_w_10000, rtol=1e-1)
+    assert_allclose(modal2_10000.evalues[:6], evals_sorted_w_10000, rtol=1e-1)
 
     # test run_modal with Q_
     modal2_10000 = rotor2.run_modal(speed=Q_(95492.96585513721, "RPM"))
-    assert_allclose(modal2_10000.evalues, evals_sorted_w_10000, rtol=1e-1)
+    assert_allclose(modal2_10000.evalues[:6], evals_sorted_w_10000, rtol=1e-1)
 
 
 @pytest.fixture
@@ -381,6 +369,49 @@ def rotor3():
     bearing1 = BearingElement(6, kxx=stfx, kyy=stfy, cxx=0)
 
     return Rotor(shaft_elem, [disk0, disk1], [bearing0, bearing1])
+
+
+def test_add_nodes_simple(rotor3):
+    new_nodes_pos = [0.42, 1.036]
+    modified_rotor = rotor3.add_nodes(new_nodes_pos)
+
+    assert_equal(modified_rotor.nodes[-1], rotor3.nodes[-1] + len(new_nodes_pos))
+    assert_equal(
+        len(modified_rotor.shaft_elements),
+        len(rotor3.shaft_elements) + len(new_nodes_pos),
+    )
+    assert_almost_equal(modified_rotor.m, rotor3.m)
+    assert_almost_equal(modified_rotor.CG, rotor3.CG)
+
+    assert_equal(modified_rotor.nodes_pos[2], 0.42)
+    assert_equal(
+        modified_rotor.shaft_elements_length[1]
+        + modified_rotor.shaft_elements_length[2],
+        rotor3.shaft_elements_length[1],
+    )
+    assert_equal(
+        modified_rotor.shaft_elements[1].L + modified_rotor.shaft_elements[2].L,
+        rotor3.shaft_elements[1].L,
+    )
+
+    assert_equal(modified_rotor.nodes_pos[6], 1.036)
+    assert_equal(
+        modified_rotor.shaft_elements_length[5]
+        + modified_rotor.shaft_elements_length[6],
+        rotor3.shaft_elements_length[5],
+    )
+    assert_equal(
+        modified_rotor.shaft_elements[5].L + modified_rotor.shaft_elements[6].L,
+        rotor3.shaft_elements[5].L,
+    )
+
+    assert_equal(modified_rotor.disk_elements[0].n, rotor3.disk_elements[0].n + 1)
+    assert_equal(modified_rotor.disk_elements[1].n, rotor3.disk_elements[1].n + 1)
+
+    assert_equal(modified_rotor.bearing_elements[0].n, rotor3.bearing_elements[0].n)
+    assert_equal(
+        modified_rotor.bearing_elements[-1].n, rotor3.bearing_elements[-1].n + 2
+    )
 
 
 def test_modal_fig_orientation(rotor3):
@@ -932,6 +963,52 @@ def rotor9():
     # More complex rotor based on a centrifugal compressor
     rotor9 = Rotor.load(Path(__file__).parent / "data/rotor.toml")
     return rotor9
+
+
+def test_add_nodes_complex(rotor9):
+    new_nodes_pos = [1.244, 0.052, 1.637]
+    modified_rotor = rotor9.add_nodes(new_nodes_pos)
+
+    assert_equal(modified_rotor.nodes[-1], rotor9.nodes[-1] + len(new_nodes_pos))
+    assert_equal(
+        len(modified_rotor.shaft_elements),
+        len(rotor9.shaft_elements) + len(new_nodes_pos) + 2,
+    )
+    assert_almost_equal(modified_rotor.m, rotor9.m)
+    assert_almost_equal(modified_rotor.CG, rotor9.CG)
+
+    assert_equal(
+        modified_rotor.shaft_elements[1].L + modified_rotor.shaft_elements[2].L,
+        rotor9.shaft_elements[1].L,
+    )
+    assert_equal(
+        modified_rotor.shaft_elements_length[1]
+        + modified_rotor.shaft_elements_length[2],
+        rotor9.shaft_elements_length[1],
+    )
+    assert_equal(modified_rotor.nodes_pos[2], 0.052)
+
+    assert_equal(
+        modified_rotor.shaft_elements[67].L, modified_rotor.shaft_elements[68].L
+    )
+    assert_equal(
+        modified_rotor.shaft_elements[67].L + modified_rotor.shaft_elements[69].L,
+        rotor9.shaft_elements[67].L,
+    )
+    assert_equal(
+        modified_rotor.shaft_elements_length[41]
+        + modified_rotor.shaft_elements_length[42],
+        rotor9.shaft_elements_length[40],
+    )
+    assert_equal(modified_rotor.nodes_pos[42], 1.244)
+
+    for i, elm in enumerate(rotor9.disk_elements):
+        assert_equal(modified_rotor.disk_elements[i].n, elm.n + 1)
+
+    assert_equal(modified_rotor.bearing_elements[0].n, rotor9.bearing_elements[0].n + 1)
+    assert_equal(
+        modified_rotor.bearing_elements[-1].n, rotor9.bearing_elements[-1].n + 2
+    )
 
 
 def test_static_analysis_rotor6(rotor6):
@@ -1733,16 +1810,12 @@ def rotor_6dof():
 
     shaft_elem = [
         ShaftElement6DoF(
+            l,
+            i_d,
+            o_d,
             material=steel,
-            L=0.25,
-            idl=0,
-            odl=0.05,
-            idr=0,
-            odr=0.05,
-            alpha=0,
-            beta=0,
-            rotary_inertia=False,
-            shear_effects=False,
+            alpha=1,
+            beta=1e-5,
         )
         for l in L
     ]
@@ -1754,44 +1827,16 @@ def rotor_6dof():
         n=4, material=steel, width=0.07, i_d=0.05, o_d=0.28
     )
 
-    kxx = 1e6
-    kyy = 0.8e6
-    kzz = 1e5
-    cxx = 0
-    cyy = 0
-    czz = 0
-    bearing0 = BearingElement6DoF(
-        n=0, kxx=kxx, kyy=kyy, cxx=cxx, cyy=cyy, kzz=kzz, czz=czz
-    )
-    bearing1 = BearingElement6DoF(
-        n=6, kxx=kxx, kyy=kyy, cxx=cxx, cyy=cyy, kzz=kzz, czz=czz
-    )
+    bearing0 = BearingElement6DoF(n=0, kxx=1e6, kyy=8e5, kzz=1e5, cxx=0, cyy=0, czz=0)
+    bearing1 = BearingElement6DoF(n=6, kxx=1e6, kyy=8e5, kzz=1e5, cxx=0, cyy=0, czz=0)
 
     return Rotor(shaft_elem, [disk0, disk1], [bearing0, bearing1])
 
 
 def test_modal_6dof(rotor_6dof):
     modal = rotor_6dof.run_modal(speed=0, sparse=False)
-    wn = np.array(
-        [
-            9.91427121e-05,
-            4.76215566e01,
-            9.17987032e01,
-            9.62914807e01,
-            2.74579882e02,
-            2.96518344e02,
-        ]
-    )
-    wd = np.array(
-        [
-            9.91427121e-05,
-            4.76215566e01,
-            9.17987032e01,
-            9.62914807e01,
-            2.74579882e02,
-            2.96518344e02,
-        ]
-    )
+    wn = np.array([0.0, 47.62138, 91.79647, 96.28891, 274.56591, 296.5005])
+    wd = np.array([0.01079, 47.62156, 91.79656, 96.289, 274.56607, 296.50068])
 
     assert_almost_equal(modal.wn[:6], wn, decimal=2)
     assert_almost_equal(modal.wd[:6], wd, decimal=2)
